@@ -2,6 +2,10 @@
 
 require 'shellwords'
 
+def cleanup()
+  `rm -rf *.flac ; rm -rf *.jpg ; rm -rf *.jpeg ; rm -rf *.png; rm -rf *.pdf`
+end
+
 def encode (file)
 
   match = file.match /(.+)\.flac/
@@ -39,9 +43,7 @@ def tag_files ()
   end
 end
 
-def process_flacs()
-  files = Dir.glob("*").select{ |f| File.file?(f) && f.match(/.+\.flac/) }
-
+def encode_all(files)
   total = files.size
   processed = 0
 
@@ -58,5 +60,28 @@ def process_flacs()
     puts "processed #{processed} of #{total}"}
 end
 
-process_flacs()
+def process_flacs(fail_if_no_cover)
+
+    cover = Dir.glob("*").select{ |f| File.file?(f) && f.match(/.*cover.*\.(png|jpg|jpeg)/) }
+    flacs = Dir.glob("*").select{ |f| File.file?(f) && f.match(/.+\.flac/) }
+
+    if (cover.length > 0) && (flacs.length > 0)
+      encode_all(flacs)
+    elsif (cover.length == 0) && (flacs.length > 0) && !fail_if_no_cover
+      file = flacs[0]
+      if system("metaflac --list #{file.shellescape} | ag \"MIME type: image/jpeg\" > /dev/null ")
+        if system("metaflac #{file.shellescape} --export-picture-to=cover.jpg")
+          puts "exported cover from #{file}"
+          process_flacs(true)
+        else
+          puts "EXPORT ERROR"
+        end
+      else
+        puts "COVER IMAGE NOT FOUND"
+      end
+    end
+end
+
+process_flacs(false)
 tag_files()
+cleanup()
