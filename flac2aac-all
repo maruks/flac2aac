@@ -1,0 +1,52 @@
+#!/usr/bin/env ruby
+
+require 'shellwords'
+
+def cleanup()
+  `rm -rf *.flac ; rm -rf *.jpg ; rm -rf *.jpeg ; rm -rf *.png; rm -rf *.pdf`
+end
+
+def do_encode(fail_if_no_cover)
+
+    cover = Dir.glob("*").select{ |f| File.file?(f) && f.match(/.*cover.*\.(png|jpg|jpeg)/) }
+    flacs = Dir.glob("*").select{ |f| File.file?(f) && f.match(/.+\.flac/) }
+
+    if (cover.length > 0) && (flacs.length > 0)
+      if system("flac2aac")
+        cleanup()
+      end
+    elsif (cover.length == 0) && (flacs.length > 0) && !fail_if_no_cover
+      file = flacs[0]
+      if system("metaflac --list #{file.shellescape} | ag \"MIME type: image/jpeg\" > /dev/null ")
+        if system("metaflac #{file.shellescape} --export-picture-to=cover.jpg")
+          puts "exported cover from #{file}"
+          do_encode(true)
+        else
+          puts "EXPORT ERROR"
+        end
+      else
+        puts "COVER IMAGE NOT FOUND"
+      end
+    end
+
+end
+
+
+def encode (file)
+
+  res = Dir.chdir(file)
+
+  if res then
+    flacs = Dir.glob("*").select{ |f| File.file?(f) && f.match(/.+\.flac/) }
+    if (flacs.length > 0)
+      puts "-------------------- #{file} --------------------"
+      do_encode(false)
+    end
+  end
+
+  Dir.chdir("..")
+end
+
+files = Dir.glob("*").select{ |f| File.directory?(f) }
+
+files.each{ |file| encode(file) }

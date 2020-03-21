@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+
+require 'shellwords'
+
+def encode (file)
+
+  match = file.match /(.+)\.flac/
+
+  if match
+    name = match[1] + ".m4a"
+    unless system("ffmpeg -loglevel quiet -i #{file.shellescape} -c:a libfdk_aac -vn -ar 44100 -vbr 5 -cutoff 20000 -y #{name.shellescape}")
+      puts "ENCODE ERROR #{file}"
+      fail
+    end
+  else
+    puts "ERROR: NO MATCH #{file}"
+    fail
+  end
+end
+
+def tag(file, cover)
+  unless system("AtomicParsley #{file.shellescape} --artwork #{cover.shellescape} --overWrite > /dev/null")
+    puts "TAG ERROR #{file} #{cover}"
+    fail
+  end
+end
+
+def tag_files ()
+
+  match = Dir.glob("*").select{ |f| File.file?(f) && f.match(/.*cover.*\.(png|jpg|jpeg)/) }
+  files = Dir.glob("*").select{ |f| File.file?(f) && f.match(/.+\.m4a/) }
+
+  if (match.length > 0) && (files.length > 0)
+    cover = match[0]
+    files.each{ |file| tag(file, cover)}
+  else
+    puts "TAG ERROR: FILES NOT FOUND"
+    fail
+  end
+end
+
+def process_flacs()
+  files = Dir.glob("*").select{ |f| File.file?(f) && f.match(/.+\.flac/) }
+
+  total = files.size
+  processed = 0
+
+  puts "#{total} files found"
+
+  unless total > 0
+    puts "ERROR: FILES NOT FOUND"
+    fail
+  end
+
+  files.each{ |file|
+    encode(file)
+    processed += 1
+    puts "processed #{processed} of #{total}"}
+end
+
+process_flacs()
+tag_files()
